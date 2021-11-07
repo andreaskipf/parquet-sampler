@@ -3,7 +3,6 @@ use rand::Rng;
 use std::collections::HashSet;
 use std::env;
 use std::fs::File;
-use std::fs::OpenOptions;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -16,31 +15,14 @@ use parquet::record::RowAccessor;
 use parquet::schema::parser::parse_message_type;
 use parquet::schema::printer;
 
-fn format_row(row: &parquet::record::Row, delimiter: &str) -> String {
-  row
-    .get_column_iter()
-    .map(|c| c.1.to_string())
-    .collect::<Vec<String>>()
-    .join(delimiter)
-}
-
 // NOTE: Overwrites output file.
 
 fn main() {
   // Read and check arguments.
   let args: Vec<String> = env::args().collect();
   let in_file_name = &args[1];
-  // if !in_file_name.ends_with(".parquet") {
-  //   panic!("`file_name` needs to end with `.parquet`.");
-  // }
   let out_file_name = &args[2];
   let sample_ratio = &args[3].parse::<f64>().unwrap();
-
-  // Assemble out file name.
-  // let out_file_name = in_file_name.replace(
-  //   ".parquet",
-  //   &format!("_sample_{}.parquet", sample_ratio.to_string()),
-  // );
 
   println!("input file: {}", in_file_name);
   println!("output file: {}", out_file_name);
@@ -65,7 +47,6 @@ fn main() {
   let mut rng = rand::thread_rng();
   while random_indexes.len() < sample_size {
     let index = rng.gen_range(0..num_rows) as usize;
-    // println!("random index: {}", index);
     random_indexes.insert(index);
   }
 
@@ -75,7 +56,8 @@ fn main() {
 
   println!("reading input...");
 
-  // Iterate through the entire input file (parquet doesn't support random access) and collect sampled rows.
+  // Iterate through the entire input file (parquet doesn't support random access) and
+  // collect sampled rows.
   let mut sampled_rows: Vec<parquet::record::Row> = Vec::new();
   let mut curr_row = 0;
   let mut curr_index = 0; // Index into `random_indexes_sorted`.
@@ -94,7 +76,6 @@ fn main() {
     }
 
     if curr_row == random_indexes_sorted[curr_index] {
-      // println!("{}", format_row(&row, ","));
       sampled_rows.push(row);
       curr_index += 1;
     }
@@ -123,13 +104,20 @@ fn main() {
 
   let mut curr_column = 0;
   while let Some(mut col_writer) = row_group_writer.next_column().unwrap() {
-    // We need to pass "definition levels" to `write_batch()` since the schema might contain OPTIONAL fields.
-    let def_levels = vec![1; sampled_rows.len()];
+    // We need to pass "definition levels" to `write_batch()` since the schema might
+    // contain OPTIONAL fields.
+    let mut def_levels = Vec::with_capacity(sampled_rows.len());
+
     match col_writer {
       ColumnWriter::BoolColumnWriter(ref mut typed_writer) => {
         let mut col = Vec::with_capacity(sampled_rows.len());
         for row in &sampled_rows {
-          col.push(row.get_bool(curr_column).unwrap());
+          if let Ok(val) = row.get_bool(curr_column) {
+            col.push(val);
+            def_levels.push(1);
+          } else {
+            def_levels.push(0);
+          }
         }
         typed_writer
           .write_batch(&col[..], Some(&def_levels[..]), None)
@@ -138,7 +126,12 @@ fn main() {
       ColumnWriter::Int32ColumnWriter(ref mut typed_writer) => {
         let mut col = Vec::with_capacity(sampled_rows.len());
         for row in &sampled_rows {
-          col.push(row.get_int(curr_column).unwrap());
+          if let Ok(val) = row.get_int(curr_column) {
+            col.push(val);
+            def_levels.push(1);
+          } else {
+            def_levels.push(0);
+          }
         }
         typed_writer
           .write_batch(&col[..], Some(&def_levels[..]), None)
@@ -147,7 +140,12 @@ fn main() {
       ColumnWriter::Int64ColumnWriter(ref mut typed_writer) => {
         let mut col = Vec::with_capacity(sampled_rows.len());
         for row in &sampled_rows {
-          col.push(row.get_long(curr_column).unwrap());
+          if let Ok(val) = row.get_long(curr_column) {
+            col.push(val);
+            def_levels.push(1);
+          } else {
+            def_levels.push(0);
+          }
         }
         typed_writer
           .write_batch(&col[..], Some(&def_levels[..]), None)
@@ -156,7 +154,12 @@ fn main() {
       ColumnWriter::FloatColumnWriter(ref mut typed_writer) => {
         let mut col = Vec::with_capacity(sampled_rows.len());
         for row in &sampled_rows {
-          col.push(row.get_float(curr_column).unwrap());
+          if let Ok(val) = row.get_float(curr_column) {
+            col.push(val);
+            def_levels.push(1);
+          } else {
+            def_levels.push(0);
+          }
         }
         typed_writer
           .write_batch(&col[..], Some(&def_levels[..]), None)
@@ -165,7 +168,12 @@ fn main() {
       ColumnWriter::DoubleColumnWriter(ref mut typed_writer) => {
         let mut col = Vec::with_capacity(sampled_rows.len());
         for row in &sampled_rows {
-          col.push(row.get_double(curr_column).unwrap());
+          if let Ok(val) = row.get_double(curr_column) {
+            col.push(val);
+            def_levels.push(1);
+          } else {
+            def_levels.push(0);
+          }
         }
         typed_writer
           .write_batch(&col[..], Some(&def_levels[..]), None)
@@ -174,8 +182,12 @@ fn main() {
       ColumnWriter::ByteArrayColumnWriter(ref mut typed_writer) => {
         let mut col = Vec::with_capacity(sampled_rows.len());
         for row in &sampled_rows {
-          let val = row.get_string(curr_column).unwrap();
-          col.push(parquet::data_type::ByteArray::from(&val[..]));
+          if let Ok(val) = row.get_string(curr_column) {
+            col.push(parquet::data_type::ByteArray::from(&val[..]));
+            def_levels.push(1);
+          } else {
+            def_levels.push(0);
+          }
         }
         typed_writer
           .write_batch(&col[..], Some(&def_levels[..]), None)
