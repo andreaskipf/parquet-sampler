@@ -9,6 +9,9 @@ use parquet::file::reader::{FileReader, SerializedFileReader};
 
 // NOTE: Overwrites output file.
 
+// EXAMPLE USAGE:
+// ./sample dim1.parquet dim1_0.1.parquet 0.1
+
 fn main() {
   // Read and check arguments.
   let args: Vec<String> = env::args().collect();
