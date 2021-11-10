@@ -129,7 +129,7 @@ fn main() {
   println!("finished probing hash table");
 
   println!(
-    "semi join reduced input by {} rows",
+    "semi-join reduced input by {} rows",
     num_probe_rows as usize - output_rows.len()
   );
 
