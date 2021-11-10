@@ -4,6 +4,14 @@
 
 `join` reduces a dimension table using a downsampled fact table.
 
+## Build
+```
+git clone git@github.com:andreaskipf/parquet-sampler.git
+cd parquet-sampler/
+cargo build --release
+cd target/release/
+```
+
 ## Sample fact tables individually
 ```
 ./sample attrib.parquet attrib_0.001.parquet 0.001
